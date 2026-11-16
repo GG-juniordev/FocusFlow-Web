@@ -1,5 +1,6 @@
 import { MotionConfig } from 'motion/react'
 import { Bento } from './components/Bento'
+import { DownloadToast } from './components/Download'
 import { Hero, Nav } from './components/Hero'
 import { Download, Faq, Footer, Studio, Workflow } from './components/Sections'
 import { ThemeProvider } from './lib/theme'
@@ -20,6 +21,7 @@ export function App() {
           <Faq />
         </main>
         <Footer />
+        <DownloadToast />
       </ThemeProvider>
     </MotionConfig>
   )

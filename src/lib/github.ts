@@ -10,12 +10,16 @@ const API = `https://api.github.com/repos/${REPO}`
 export interface ReleaseInfo {
   /** e.g. "v1.0.0" */
   tag: string
-  /** Direct link to the .exe, or null if the release has no installer attached. */
+  /**
+   * The installer's `browser_download_url`: a direct link to the .exe file itself
+   * (github.com/<repo>/releases/download/<tag>/<file>.exe), never a web page.
+   * Null only if no release has an .exe attached.
+   */
   downloadUrl: string | null
   fileName: string | null
   sizeBytes: number | null
+  /** The release's page on GitHub, for "release notes" links only. */
   pageUrl: string
-  publishedAt: string | null
 }
 
 export interface RepoInfo {
@@ -26,21 +30,24 @@ export interface RepoInfo {
   loading: boolean
 }
 
-const CACHE_KEY = 'focusflow-site:github:v1'
-const CACHE_MS = 10 * 60 * 1000
-
-interface Cached {
+interface Loaded {
   at: number
   stars: number | null
   release: ReleaseInfo | null
 }
 
-function readCache(): Cached | null {
+type Json = Record<string, unknown>
+
+const CACHE_KEY = 'focusflow-site:github:v2'
+/** A found installer is remembered for ten minutes; "nothing found" only for one, so a new release shows up quickly. */
+const ttl = (loaded: Loaded): number => (loaded.release?.downloadUrl ? 10 : 1) * 60 * 1000
+
+function readCache(): Loaded | null {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Cached
-    return Date.now() - parsed.at < CACHE_MS ? parsed : null
+    const parsed = JSON.parse(raw) as Loaded
+    return Date.now() - parsed.at < ttl(parsed) ? parsed : null
   } catch {
     return null
   }
@@ -49,7 +56,7 @@ function readCache(): Cached | null {
 async function getJson(url: string): Promise<unknown> {
   try {
     const response = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } })
-    // Rate limits answer 403; treat any failure as "unknown" and fall back to plain links.
+    // 404 (no release yet) and 403 (rate limit) both mean "nothing usable here".
     if (!response.ok) return null
     return (await response.json()) as unknown
   } catch {
@@ -57,50 +64,79 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
-function parseRelease(list: unknown): ReleaseInfo | null {
-  // Newest first. Skip drafts and pre-releases.
-  const json = Array.isArray(list)
-    ? (list as Record<string, unknown>[]).find((r) => r && r.draft !== true && r.prerelease !== true)
-    : undefined
-  if (!json || typeof json.tag_name !== 'string') return null
-  const assets = Array.isArray(json.assets) ? (json.assets as Record<string, unknown>[]) : []
-  const installers = assets.filter((a) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe'))
-  // Prefer the file named like the installer if several .exe files are attached.
-  const asset = installers.find((a) => /setup|install/i.test(a.name as string)) ?? installers[0]
+/** The .exe attached to a release, preferring one named like an installer. */
+function installerOf(release: Json): Json | undefined {
+  const assets = Array.isArray(release.assets) ? (release.assets as Json[]) : []
+  const exes = assets.filter(
+    (a) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe') && typeof a.browser_download_url === 'string'
+  )
+  return exes.find((a) => /setup|install/i.test(a.name as string)) ?? exes[0]
+}
+
+function toInfo(release: Json): ReleaseInfo | null {
+  if (typeof release.tag_name !== 'string') return null
+  const asset = installerOf(release)
   return {
-    tag: json.tag_name,
-    downloadUrl: asset && typeof asset.browser_download_url === 'string' ? asset.browser_download_url : null,
+    tag: release.tag_name,
+    downloadUrl: asset ? (asset.browser_download_url as string) : null,
     fileName: asset ? (asset.name as string) : null,
     sizeBytes: asset && typeof asset.size === 'number' ? asset.size : null,
-    pageUrl: typeof json.html_url === 'string' ? json.html_url : RELEASES_URL,
-    publishedAt: typeof json.published_at === 'string' ? json.published_at : null
+    pageUrl: typeof release.html_url === 'string' ? release.html_url : RELEASES_URL
   }
 }
 
-let inFlight: Promise<Cached> | null = null
+const isRelease = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-function load(): Promise<Cached> {
-  inFlight ??= Promise.all([getJson(API), getJson(`${API}/releases?per_page=5`)]).then(([repoJson, latest]) => {
-    const repo = repoJson && typeof repoJson === 'object' ? (repoJson as Record<string, unknown>) : null
-    const result: Cached = {
-      at: Date.now(),
-      stars: repo && typeof repo.stargazers_count === 'number' ? repo.stargazers_count : null,
-      release: parseRelease(latest)
-    }
-    try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(result))
-    } catch {
-      // Private browsing: just skip the cache.
-    }
-    return result
-  })
+/**
+ * Find the installer to offer.
+ * 1. /releases/latest, if it is a full release with an .exe attached.
+ * 2. Otherwise the releases list: the newest full release with an .exe, then the
+ *    newest pre-release with one.
+ * If no release anywhere has an .exe, returns the newest release without a
+ * download link (so the version can still be shown), or null.
+ */
+async function findRelease(): Promise<ReleaseInfo | null> {
+  const latest = await getJson(`${API}/releases/latest`)
+  if (isRelease(latest) && latest.prerelease !== true && installerOf(latest)) return toInfo(latest)
+
+  const listJson = await getJson(`${API}/releases?per_page=20`)
+  const list = Array.isArray(listJson) ? listJson.filter(isRelease).filter((r) => r.draft !== true) : []
+  const withInstaller = list.filter((r) => installerOf(r))
+  const best = withInstaller.find((r) => r.prerelease !== true) ?? withInstaller[0] ?? (isRelease(latest) ? latest : list[0])
+  return best ? toInfo(best) : null
+}
+
+let inFlight: Promise<Loaded> | null = null
+
+function load(): Promise<Loaded> {
+  const cached = readCache()
+  if (cached) return Promise.resolve(cached)
+  inFlight ??= Promise.all([getJson(API), findRelease()])
+    .then(([repo, release]) => {
+      const loaded: Loaded = {
+        at: Date.now(),
+        stars: isRelease(repo) && typeof repo.stargazers_count === 'number' ? repo.stargazers_count : null,
+        release
+      }
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(loaded))
+      } catch {
+        // Private browsing: just skip the cache.
+      }
+      return loaded
+    })
+    .finally(() => {
+      inFlight = null
+    })
   return inFlight
 }
 
+/** Resolves once the release lookup has finished. Used when Download is clicked before it has. */
+export const resolveRelease = (): Promise<ReleaseInfo | null> => load().then((loaded) => loaded.release)
+
 /**
- * Live star count and latest release, fetched once per visit and cached for ten
- * minutes (GitHub allows 60 anonymous requests an hour per visitor). Everything
- * on the page works without it: links fall back to the releases page.
+ * Live star count and latest release, fetched on page load and cached briefly
+ * (GitHub allows 60 anonymous requests an hour per visitor).
  */
 export function useRepo(): RepoInfo {
   const [info, setInfo] = useState<RepoInfo>(() => {

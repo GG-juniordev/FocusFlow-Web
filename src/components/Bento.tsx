@@ -496,8 +496,8 @@ export function Bento() {
         lead="No screenshots. Every card below is a small working piece of the app's behaviour."
       />
 
-      <motion.div variants={stagger} {...inView} className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-6">
-        <SpotlightCard className="md:col-span-4">
+      <motion.div variants={stagger} {...inView} className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <SpotlightCard className="md:col-span-2 lg:col-span-4">
           <Copy title="Active focus, then a floating Zen bar">
             One task on screen with its own countdown. When you switch to your code or your notes, shrink FocusFlow to a
             small always-on-top bar: task, time left, and a Complete button.
@@ -505,7 +505,7 @@ export function Bento() {
           <ZenPreview />
         </SpotlightCard>
 
-        <SpotlightCard className="md:col-span-2">
+        <SpotlightCard className="md:col-span-2 lg:col-span-2">
           <Copy title="Tasks that bring their tools">
             Break a task into steps, and attach the apps and links it needs. Tools with a link open on click, and you can
             give any tool an emoji or your own icon.
@@ -513,7 +513,7 @@ export function Bento() {
           <ToolkitPreview />
         </SpotlightCard>
 
-        <SpotlightCard className="md:col-span-3">
+        <SpotlightCard className="lg:col-span-3">
           <Copy title="A calendar that allows “sometime today”">
             Tasks with a day but no time wait in a Flexible row. Drag one onto an hour to block time for it, or drag a block
             back up to free it.
@@ -521,7 +521,7 @@ export function Bento() {
           <CalendarPreview />
         </SpotlightCard>
 
-        <SpotlightCard className="md:col-span-3">
+        <SpotlightCard className="lg:col-span-3">
           <Copy title="Your colours, down to the background">
             Pick the accent, the app background and the card colour, from presets or any HEX value. Text contrast is worked
             out for you.
@@ -529,7 +529,7 @@ export function Bento() {
           <ColorPreview />
         </SpotlightCard>
 
-        <SpotlightCard className="md:col-span-3">
+        <SpotlightCard className="lg:col-span-3">
           <Copy title="Behaves like a Windows app">
             Starts with Windows if you want it to, closes to the system tray without quitting, and uses native
             notifications before a time block and when a timer ends.
@@ -537,7 +537,7 @@ export function Bento() {
           <NativePreview />
         </SpotlightCard>
 
-        <SpotlightCard className="md:col-span-3">
+        <SpotlightCard className="lg:col-span-3">
           <Copy title="Local first, cloud only when you say so">
             It opens instantly and works offline, with no account. Cloud sync through Supabase is optional, and it runs
             when you press Sync now, not in the background.

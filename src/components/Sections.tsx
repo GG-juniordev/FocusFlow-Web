@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronDown, Cpu, HardDrive, ListChecks, CalendarClock, PictureInPicture2, ShieldCheck, WifiOff } from 'lucide-react'
-import { ISSUES_URL, RELEASES_URL, REPO_URL, useRepo } from '../lib/github'
+import { ISSUES_URL, RELEASES_URL, REPO_URL, formatSize, useRepo } from '../lib/github'
 import { ACCENTS, PRESETS, useTheme } from '../lib/theme'
 import { AppMockup } from './AppMockup'
-import { DownloadButton, useDownload } from './Hero'
+import { DownloadButton, DownloadMeta } from './Download'
 import { EASE, GitHubMark, Logo, Mono, SectionHeading, cn, inView, rise, stagger } from './ui'
 
 /* ---------- Interactive Studio ---------- */
@@ -139,7 +139,8 @@ export function Workflow() {
 
 export function Download() {
   const { release, loading } = useRepo()
-  const { size, tag, direct } = useDownload()
+  const tag = release?.tag ?? null
+  const size = release?.sizeBytes ? formatSize(release.sizeBytes) : null
   const [open, setOpen] = useState(false)
   const specs = [
     { icon: Cpu, label: 'System', value: 'Windows 10 or 11, 64-bit' },
@@ -155,7 +156,7 @@ export function Download() {
         <div className="relative grid gap-10 p-7 sm:p-12 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <div>
             <motion.div variants={rise}>
-              <Mono className="!text-amber">{tag ?? (loading ? 'checking latest release…' : 'latest release')}</Mono>
+              <Mono className="!text-amber">{tag ?? (loading ? 'checking…' : 'latest release')}</Mono>
             </motion.div>
             <motion.h2 variants={rise} className="mt-4 text-[36px] font-bold leading-[1.06] text-ink sm:text-[48px]">
               Install it in under a minute.
@@ -169,11 +170,9 @@ export function Download() {
                 All releases and release notes
               </a>
             </motion.div>
-            {!loading && !direct && (
-              <motion.p variants={rise} className="mt-4 text-[13.5px] text-faint">
-                {release ? 'This release has no installer attached yet. The button opens its page on GitHub.' : 'The button opens the releases page on GitHub, where the installer is published.'}
-              </motion.p>
-            )}
+            <motion.div variants={rise} className="mt-4">
+              <DownloadMeta className="!justify-start" />
+            </motion.div>
           </div>
 
           <motion.dl variants={rise} className="grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-2">

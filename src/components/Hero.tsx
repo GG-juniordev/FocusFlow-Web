@@ -1,9 +1,10 @@
 import { useRef, type MouseEvent } from 'react'
 import { motion, useMotionValue, useScroll, useSpring, useTransform } from 'motion/react'
-import { ArrowDownToLine, Star } from 'lucide-react'
-import { REPO_URL, RELEASES_URL, formatSize, formatStars, useRepo } from '../lib/github'
+import { Star } from 'lucide-react'
+import { REPO_URL, RELEASES_URL, formatStars, useRepo } from '../lib/github'
 import { AppMockup } from './AppMockup'
-import { GitHubMark, Logo, Magnetic, Mono, WindowsGlyph, cn, rise, stagger } from './ui'
+import { DownloadButton, DownloadMeta } from './Download'
+import { GitHubMark, Logo, Mono, rise, stagger } from './ui'
 
 const LINKS = [
   { href: '#features', label: 'Features' },
@@ -11,46 +12,6 @@ const LINKS = [
   { href: '#workflow', label: 'Workflow' },
   { href: '#faq', label: 'FAQ' }
 ]
-
-/**
- * The download link: the latest release's .exe when GitHub reports one,
- * otherwise the releases page, so the button always leads somewhere useful.
- */
-export function useDownload(): { href: string; direct: boolean; tag: string | null; size: string | null } {
-  const { release } = useRepo()
-  return {
-    href: release?.downloadUrl ?? release?.pageUrl ?? RELEASES_URL,
-    direct: !!release?.downloadUrl,
-    tag: release?.tag ?? null,
-    size: release?.sizeBytes ? formatSize(release.sizeBytes) : null
-  }
-}
-
-/** `shortLabel` replaces `label` on narrow screens so the button stays on one line. */
-export function DownloadButton({ size = 'md', label, shortLabel }: { size?: 'md' | 'lg'; label: string; shortLabel?: string }) {
-  const { href, direct } = useDownload()
-  return (
-    <Magnetic>
-      <a
-        href={href}
-        // A direct .exe link downloads in place; the releases page opens in a new tab.
-        {...(direct ? {} : { target: '_blank', rel: 'noreferrer' })}
-        data-testid="download"
-        className={cn(
-          'group relative inline-flex items-center overflow-hidden whitespace-nowrap rounded-full bg-amber font-semibold text-[#1a1206] transition-[filter,transform] duration-200 hover:brightness-110 active:scale-[0.97]',
-          size === 'lg' ? 'h-14 gap-2.5 px-5 text-[15px] sm:gap-3 sm:px-7 sm:text-[16px]' : 'h-10 gap-2 px-4 text-[13.5px]'
-        )}
-        style={{ boxShadow: '0 0 0 1px rgb(255 255 255 / 0.25) inset, 0 10px 40px -8px rgb(245 169 59 / 0.55)' }}
-      >
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1/3 animate-shimmer bg-gradient-to-r from-transparent via-white/55 to-transparent" />
-        <WindowsGlyph size={size === 'lg' ? 17 : 14} className="relative" />
-        <span className={cn('relative', shortLabel && 'hidden sm:inline')}>{label}</span>
-        {shortLabel && <span className="relative sm:hidden">{shortLabel}</span>}
-        {size === 'lg' && <ArrowDownToLine size={18} className="relative transition-transform duration-200 group-hover:translate-y-0.5" />}
-      </a>
-    </Magnetic>
-  )
-}
 
 export function Nav() {
   const { stars } = useRepo()
@@ -66,9 +27,9 @@ export function Nav() {
           <Logo size={26} />
           <span className="font-display text-[16px] font-bold tracking-[-0.03em]">FocusFlow</span>
         </a>
-        <div className="hidden items-center md:flex">
+        <div className="hidden items-center lg:flex">
           {LINKS.map((link) => (
-            <a key={link.href} href={link.href} className="rounded-full px-3 py-1.5 text-[13.5px] text-dim transition-colors hover:bg-white/[0.06] hover:text-ink">
+            <a key={link.href} href={link.href} className="whitespace-nowrap rounded-full px-3 py-1.5 text-[13.5px] text-dim transition-colors hover:bg-white/[0.06] hover:text-ink">
               {link.label}
             </a>
           ))}
@@ -98,7 +59,6 @@ export function Nav() {
 
 export function Hero() {
   const { release } = useRepo()
-  const { tag, size, direct } = useDownload()
   const stage = useRef<HTMLDivElement>(null)
 
   // Scroll: the window starts leaning back and settles flat as it reaches the middle of the screen.
@@ -137,14 +97,14 @@ export function Hero() {
           href={release?.pageUrl ?? RELEASES_URL}
           target="_blank"
           rel="noreferrer"
-          className="glass inline-flex items-center gap-2.5 rounded-full py-1.5 pl-3 pr-1.5 text-[13px] text-dim transition-colors hover:text-ink"
+          className="glass inline-flex max-w-full items-center gap-2 whitespace-nowrap rounded-full py-1.5 pl-3 pr-1.5 text-[11.5px] text-dim transition-colors hover:text-ink sm:gap-2.5 sm:text-[13px]"
         >
           <span className="relative flex size-2">
             <span className="absolute inset-0 animate-pulse-ring rounded-full bg-amber" />
             <span className="relative size-2 rounded-full bg-amber" />
           </span>
           Free &amp; Open Source <span className="text-faint">•</span> Windows 10/11
-          <Mono className="!text-amber">{tag ?? 'latest'}</Mono>
+          <Mono className="min-w-[52px] justify-center !text-amber">{release?.tag ?? 'latest'}</Mono>
         </motion.a>
 
         <motion.h1 variants={rise} className="mt-6 text-[42px] font-extrabold leading-[1.03] text-ink sm:text-[60px] lg:text-[72px]">
@@ -165,16 +125,16 @@ export function Hero() {
             href={REPO_URL}
             target="_blank"
             rel="noreferrer"
-            className="glass inline-flex h-14 items-center gap-2.5 rounded-full px-6 text-[15px] font-medium text-ink transition-colors hover:border-white/25"
+            className="glass inline-flex h-14 items-center justify-center gap-2.5 whitespace-nowrap rounded-full px-6 text-[15px] font-medium leading-none text-ink transition-colors hover:border-white/25 sm:text-[16px]"
           >
             <GitHubMark size={17} />
             View on GitHub
           </a>
         </motion.div>
 
-        <motion.p variants={rise} className="mt-4 font-mono text-[12px] text-faint" data-testid="download-meta">
-          {direct ? `${tag}${size ? ` · ${size}` : ''} · Windows 10/11 64-bit` : 'Windows 10/11 64-bit · installer on the GitHub releases page'}
-        </motion.p>
+        <motion.div variants={rise} className="mt-4">
+          <DownloadMeta />
+        </motion.div>
       </motion.div>
 
       {/* The live demo */}
